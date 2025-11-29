@@ -1,0 +1,14 @@
+{
+  "name": "jobhunter",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "dependencies": {
+    "csv-stringify": "^6.0.5",
+    "jsonwebtoken": "^9.0.0",
+    "googleapis": "^121.0.0",
+    "google-auth-library": "^8.8.0"
+  },
+  "engines": {
+    "node": "18"
+  }
+}
