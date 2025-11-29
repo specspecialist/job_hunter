@@ -1,0 +1,24 @@
+{
+  "name": "jobhunter-deploy",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "fetch": "node tools/fetcher.js",
+    "scrape": "node tools/scraper.js",
+    "build-data": "node tools/build_index.js",
+    "export-sheets": "node tools/export_sheets.js"
+  },
+  "dependencies": {
+    "csv-stringify": "^6.0.5",
+    "jsonwebtoken": "^9.0.0",
+    "googleapis": "^121.0.0",
+    "google-auth-library": "^8.8.0",
+    "rss-parser": "^3.12.0",
+    "@aws-sdk/client-s3": "^3.0.0",
+    "playwright": "^1.40.0",
+    "node-fetch": "^2.6.7"
+  },
+  "engines": {
+    "node": "18"
+  }
+}

@@ -1,14 +1,16 @@
-# JobHunter - Hybrid (integrated)
+# JobHunter — Deploy Package
 
-This package includes a decision module (`tools/decider.js`) that decides whether a source should be fetched via API/RSS or scraped.
-- `tools/fetcher.js` uses decider to classify sources and writes:
-  - `data/api_jobs.json` (from APIs/RSS)
-  - `data/sources_to_scrape.json` (sources marked for scraping)
-  - `data/manual_review.json` (sources needing manual review)
-- `tools/scraper.js` reads `data/sources_to_scrape.json` and runs built-in scrapers for known hosts.
+This package is ready to be pushed to GitHub and deployed on Netlify.
 
-Workflow:
-1. Run `node tools/fetcher.js`
-2. Run `npx playwright install --with-deps` then `node tools/scraper.js`
-3. Run `node tools/build_index.js` to merge results
+Key steps:
+1. Fill `.env.template` and set Netlify environment variables.
+2. Add GitHub Actions secrets for JOB_SOURCES, GS_CREDS_B64, GS_SHEET_ID, etc.
+3. Configure Netlify to deploy the `main` branch.
+4. Run the Fetch & Scrape workflow once to generate `data/index.json`.
 
+Files included:
+- index.html (homepage with dark/light + chart)
+- admin.html (admin with login + quick filters + delete UI)
+- tools/ (fetcher, scraper, decider, build_index, export_sheets)
+- netlify/functions (jobs, export_sheets, login, delete_job)
+- .github/workflows (fetch-and-scrape.yml, export-to-sheets.yml, remove-job.yml)

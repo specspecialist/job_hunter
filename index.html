@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>JobHunter — Hybrid</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root{--bg:#f7f9fc;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#1a73e8;}
+  [data-theme="dark"]{--bg:#0b1220;--card:#081222;--text:#e6eef7;--muted:#95a3b5;--accent:#4ea8ff;}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Arial;}
+  header{background:var(--card);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+  .brand{font-weight:700}
+  .container{max-width:1100px;margin:24px auto;padding:18px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  input,select,button{padding:10px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);background:var(--card);color:var(--text)}
+  button{background:var(--accent);color:#fff;border:none}
+  .layout{display:grid;grid-template-columns:1fr 360px;gap:18px}
+  .job-card{background:var(--card);padding:14px;border-radius:10px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+  .meta{color:var(--muted);font-size:13px;margin-top:6px}
+  .admin-link{display:inline-block;margin-top:12px;color:var(--accent);text-decoration:none}
+  @media (max-width:900px){ .layout{grid-template-columns:1fr} .controls{flex-direction:column} }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">JobHunter — Unified Feed</div>
+  <div>
+    <button id="themeToggle">Toggle Theme</button>
+    <a class="admin-link" href="/admin.html">Admin</a>
+  </div>
+</header>
+
+<div class="container">
+  <div class="controls">
+    <input id="q" placeholder="Search (title, company, location)" style="flex:1" />
+    <select id="hours">
+      <option value="24">Last 24h</option>
+      <option value="48">48h</option>
+      <option value="72">72h</option>
+      <option value="168">7 days</option>
+    </select>
+    <button id="searchBtn">Search</button>
+  </div>
+
+  <div class="layout">
+    <div>
+      <div id="jobsList">Loading…</div>
+    </div>
+
+    <aside>
+      <div style="background:var(--card);padding:12px;border-radius:10px;margin-bottom:12px">
+        <h4 style="margin:0 0 8px 0">Jobs by source</h4>
+        <canvas id="sourceChart" width="400" height="260"></canvas>
+      </div>
+
+      <div style="background:var(--card);padding:12px;border-radius:10px">
+        <h4 style="margin:0 0 8px 0">Quick filters</h4>
+        <button id="filterDigital">Digital Marketing</button>
+        <button id="filterDev">Software Dev</button>
+        <button id="filterDesign">Design</button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function(){const root=document.documentElement;const stored=localStorage.getItem('jh_theme')||((window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches)?'dark':'light');root.setAttribute('data-theme',stored);document.getElementById('themeToggle').addEventListener('click',()=>{const cur=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',cur);localStorage.setItem('jh_theme',cur);});})();
+let allJobs=[];
+async function fetchIndex(hours=24){const res=await fetch(`/.netlify/functions/jobs?hours=${hours}`);return res.ok?(await res.json()).jobs||[]:[];}
+function renderJobs(jobs){const node=document.getElementById('jobsList');node.innerHTML='';if(!jobs.length){node.innerHTML='<div style="padding:12px">No jobs found.</div>';return;}for(const j of jobs){const el=document.createElement('div');el.className='job-card';el.innerHTML=`<div style="font-weight:600">${escapeHtml(j.title||'Untitled')}</div><div class="meta">${escapeHtml(j.company||'Unknown')} • ${escapeHtml(j.location||'N/A')}<br>Source: ${escapeHtml(j.source||'')} • ${escapeHtml(j.source_type||'')}</div><div style="margin-top:8px"><a href="${j.url||'#'}" target="_blank"><button>View Job</button></a></div>`;node.appendChild(el);} }
+function escapeHtml(s){return(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function buildChart(jobs){const counts={};jobs.forEach(j=>counts[j.source]=(counts[j.source]||0)+1);const labels=Object.keys(counts);const data=Object.values(counts);const ctx=document.getElementById('sourceChart').getContext('2d');if(window._jhChart)window._jhChart.destroy();window._jhChart=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Jobs',data}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}});}
+async function load(hours=24,q=''){document.getElementById('jobsList').innerHTML='Loading…';try{const jobs=await fetchIndex(hours);allJobs=jobs;const filtered=q?jobs.filter(j=>(j.title||'').toLowerCase().includes(q)||(j.company||'').toLowerCase().includes(q)||(j.location||'').toLowerCase().includes(q)):jobs;renderJobs(filtered);buildChart(jobs);}catch(e){document.getElementById('jobsList').innerHTML='<div style="padding:12px;color:var(--muted)">Failed to load.</div>';}}
+document.getElementById('searchBtn').addEventListener('click',()=>{const q=document.getElementById('q').value.trim().toLowerCase();const h=document.getElementById('hours').value;load(h,q);});
+document.getElementById('filterDigital').addEventListener('click',()=>{document.getElementById('q').value='digital marketing';document.getElementById('searchBtn').click();});
+document.getElementById('filterDev').addEventListener('click',()=>{document.getElementById('q').value='developer';document.getElementById('searchBtn').click();});
+document.getElementById('filterDesign').addEventListener('click',()=>{document.getElementById('q').value='designer';document.getElementById('searchBtn').click();});
+load();
+</script>
+</body>
+</html>

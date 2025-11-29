@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>JobHunter Admin</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>body{font-family:system-ui,Arial;padding:20px;background:#f4f6fb}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px}button{padding:6px 10px;border-radius:6px;border:none;background:#1a73e8;color:#fff}input{padding:8px;border-radius:6px;border:1px solid #ccc}</style>
+</head>
+<body>
+<h2>JobHunter Admin</h2>
+<div id="gSignIn">
+  <div id="g_id_onload" data-client_id="" data-auto_prompt="false"></div>
+  <div class="g_id_signin" data-type="standard"></div>
+</div>
+
+<div id="controls" style="display:none">
+  Hours: <input id="hours" type="number" value="24" min="1"/>
+  Category: <input id="category" placeholder="e.g. digital marketing" />
+  Company: <input id="filterCompany" placeholder="Company name" />
+  Job title: <input id="filterTitle" placeholder="Title or part" />
+  <button id="applyQuickFilter">Apply Quick Filter</button>
+  <button id="fetchBtn">Fetch</button>
+  <button id="downloadCsvBtn">Download CSV</button>
+  <button id="exportSheetsBtn">Export to Sheets</button>
+  <div id="status"></div>
+  <table id="jobsTable"></table>
+</div>
+
+<script>
+let token = null;
+function handleCredentialResponse(resp){
+  fetch('/.netlify/functions/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id_token:resp.credential})})
+  .then(r=>r.json()).then(j=>{ if(j.token){ token=j.token; document.getElementById('gSignIn').style.display='none'; document.getElementById('controls').style.display='block'; } else alert('Login failed'); });
+}
+window.handleCredentialResponse = handleCredentialResponse;
+
+async function fetchJobs(){
+  const h = document.getElementById('hours').value || 24;
+  document.getElementById('status').textContent = 'Fetching...';
+  const res = await fetch(`/.netlify/functions/jobs?hours=${h}`);
+  const j = await res.json();
+  document.getElementById('status').textContent = `Found ${j.count} jobs`;
+  const tbl = document.getElementById('jobsTable');
+  tbl.innerHTML = '';
+  const header = ['Title','Company','Location','URL','Posted At','Source','Source Type','Crawl Time','Score','Actions'];
+  const thead = document.createElement('tr'); header.forEach(h=>{const th=document.createElement('th');th.textContent=h;thead.appendChild(th)}); tbl.appendChild(thead);
+  (j.jobs||[]).forEach(job=>{
+    const tr=document.createElement('tr');
+    const vals=[job.title,job.company,job.location,job.url,job.posted_at,job.source,job.source_type,job.crawl_time,job._score||''];
+    vals.forEach(v=>{ const td=document.createElement('td'); if(v && v.startsWith && v.startsWith('http')){ const a=document.createElement('a'); a.href=v; a.textContent=v; a.target='_blank'; td.appendChild(a); } else td.textContent = v || ''; tr.appendChild(td); });
+    const delBtn=document.createElement('button'); delBtn.textContent='Delete'; delBtn.addEventListener('click',async ()=>{ if(!confirm('Delete this job permanently?')) return; const res=await fetch('/.netlify/functions/delete_job',{ method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+token }, body: JSON.stringify({ id: job.id, url: job.url }) }); const js=await res.json(); if(!res.ok) alert('Delete failed: '+(js.error||JSON.stringify(js))); else { alert('Deleted'); document.getElementById('fetchBtn').click(); } }); const tdDel=document.createElement('td'); tdDel.appendChild(delBtn); tr.appendChild(tdDel);
+    tbl.appendChild(tr);
+  });
+  window._lastJobs = j.jobs || [];
+}
+
+document.getElementById('fetchBtn').addEventListener('click', fetchJobs);
+document.getElementById('applyQuickFilter').addEventListener('click', async ()=>{
+  const company=document.getElementById('filterCompany').value.trim().toLowerCase();
+  const title=document.getElementById('filterTitle').value.trim().toLowerCase();
+  const h=document.getElementById('hours').value||24;
+  const res=await fetch(`/.netlify/functions/jobs?hours=${h}`);
+  const j=await res.json();
+  const filtered=(j.jobs||[]).filter(job=>{ if(company && !(job.company||'').toLowerCase().includes(company)) return false; if(title && !(job.title||'').toLowerCase().includes(title)) return false; return true; });
+  const tbl=document.getElementById('jobsTable'); tbl.innerHTML=''; const header=['Title','Company','Location','URL','Posted At','Source','Source Type','Crawl Time','Score','Actions']; const thead=document.createElement('tr'); header.forEach(h=>{const th=document.createElement('th');th.textContent=h;thead.appendChild(th)}); tbl.appendChild(thead);
+  filtered.forEach(job=>{ const tr=document.createElement('tr'); const vals=[job.title,job.company,job.location,job.url,job.posted_at,job.source,job.source_type,job.crawl_time,job._score||'']; vals.forEach(v=>{ const td=document.createElement('td'); if(v && v.startsWith && v.startsWith('http')){ const a=document.createElement('a'); a.href=v; a.textContent=v; a.target='_blank'; td.appendChild(a); } else td.textContent = v || ''; tr.appendChild(td); }); const delBtn=document.createElement('button'); delBtn.textContent='Delete'; delBtn.addEventListener('click',async ()=>{ if(!confirm('Delete this job permanently?')) return; const res=await fetch('/.netlify/functions/delete_job',{ method:'POST', headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+token }, body: JSON.stringify({ id: job.id, url: job.url }) }); const js=await res.json(); if(!res.ok) alert('Delete failed: '+(js.error||JSON.stringify(js))); else { alert('Deleted'); document.getElementById('fetchBtn').click(); } }); const tdDel=document.createElement('td'); tdDel.appendChild(delBtn); tr.appendChild(tdDel); tbl.appendChild(tr); });
+});
+
+document.getElementById('downloadCsvBtn').addEventListener('click', async () => {
+  if(!window._lastJobs) return alert('Fetch jobs first');
+  const rows = window._lastJobs.map(j=>[j.title,j.company,j.location,j.url,j.posted_at,j.source,j.source_type,j.crawl_time,j._score||'']);
+  const header = ['title','company','location','url','posted_at','source','source_type','crawl_time','score'];
+  const csv = [header, ...rows].map(r=>r.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='jobs.csv'; document.body.appendChild(a); a.click(); a.remove();
+});
+
+document.getElementById('exportSheetsBtn').addEventListener('click', async () => {
+  if(!token) return alert('Login first');
+  const h = document.getElementById('hours').value || 24;
+  const category = document.getElementById('category').value || '';
+  document.getElementById('status').textContent = 'Exporting to Sheets...';
+  const res = await fetch(`/.netlify/functions/export_sheets?hours=${h}&category=${encodeURIComponent(category)}`, { headers: { 'Authorization': 'Bearer ' + token }});
+  const j = await res.json();
+  document.getElementById('status').textContent = j.written ? `Exported ${j.written} rows` : `Error: ${j.error||'unknown'}`;
+});
+</script>
+</body>
+</html>
